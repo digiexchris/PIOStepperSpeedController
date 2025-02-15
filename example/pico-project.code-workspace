@@ -1,0 +1,62 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"cmake.generator": "Ninja",
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.cpptools-extension-pack",
+			"ms-vscode.vscode-embedded-tools",
+			"ms-vscode.vscode-serial-monitor",
+			"marus25.cortex-debug",
+			"spmeesseman.vscode-taskexplorer",
+			"IBM.output-colorizer",
+			"actboy168.tasks",
+			"SanaAjani.taskrunnercode",
+			"ms-vscode.cmake-tools",
+			"EditorConfig.EditorConfig",
+			"GitHub.copilot",
+			"GitHub.copilot-chat",
+			"josetr.cmake-language-support-vscode",
+			"llvm-vs-code-extensions.vscode-clangd"
+		]
+	},
+	"settings": {
+		"editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+		"C_Cpp.default.intelliSenseMode": "linux-gcc-arm",
+		"files.associations": {
+			"optional": "cpp",
+			"format": "cpp",
+			"future": "cpp",
+			"variant": "cpp",
+			"sstream": "cpp",
+			"microsh_config.h": "c",
+			"microrl.h": "c"
+		},
+		"[cpp]": {
+			"editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+		},
+		"raspberry-pi-pico.cmakeAutoConfigure": true,
+		"raspberry-pi-pico.useCmakeTools": true,
+		"cmake.configureOnEdit": true,
+		"cmake.automaticReconfigure": true,
+		"cmake.configureOnOpen": true,
+		"editor.defaultFoldingRangeProvider": "ms-vscode.cpptools",
+		"editor.folding": false,
+		"[jsonc]": {
+			"editor.defaultFormatter": "vscode.json-language-features"
+		},
+		"cmake.allowCommentsInPresetsFile": true,
+		"cmake.allowUnsupportedPresetsVersions": false,
+		"cmake.deleteBuildDirOnCleanConfigure": true,
+		"cmake.enableAutomaticKitScan": false,
+		"cmake.generator": "ninja",
+		// "cmake.ignoreKitEnv": true,
+		"cmake.options.statusBarVisibility": "visible",
+		// "cmake.showSystemKits": false,
+		"cmake.sourceDirectory": "${workspaceFolder}/src",
+		// "cmake.useCMakePresets": "always"
+	}
+}
