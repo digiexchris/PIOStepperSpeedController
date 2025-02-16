@@ -1,4 +1,4 @@
-.program PIOStepper
+.program StepperSpeedController
 .side_set 1 opt                    ; Use sideset for step pin
 
 public start:                      ; Public label for restarting

@@ -56,7 +56,7 @@
 		// "cmake.ignoreKitEnv": true,
 		"cmake.options.statusBarVisibility": "visible",
 		// "cmake.showSystemKits": false,
-		"cmake.sourceDirectory": "${workspaceFolder}/src",
+		"cmake.sourceDirectory": "${workspaceFolder}",
 		// "cmake.useCMakePresets": "always"
 	}
 }
