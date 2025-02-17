@@ -9,32 +9,66 @@ class Stepper {
 public:
   enum class CallbackEvent { STOPPED, ACCELERATING, DECELERATING, COASTING };
 
+  enum class StepperState {
+    STOPPED,
+    STOPPING,
+    STARTING,
+    ACCELERATING,
+    COASTING,
+    DECELERATING
+  };
+
   using Callback = void (*)(CallbackEvent event);
 
-  Stepper(uint stepPin, uint startSpeedHz, uint maxSpeed, uint stepsPerRotation,
-          uint acceleration, uint deceleration,
-          Callback aStoppedCallback = nullptr,
+  Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
+          uint32_t stepsPerRotation, uint32_t acceleration,
+          uint32_t deceleration, Callback aStoppedCallback = nullptr,
           Callback aCoastingCallback = nullptr,
           Callback aAcceleratingCallback = nullptr,
           Callback aDeceleratingCallback = nullptr);
 
-  void Init(float div, int stepsPerRotation, int32_t acceleration,
-            int32_t deceleration);
-  void Start(float targetHz);
-  void ForceStop();
-  bool Step();
-  void SetTargetHz(float hz) { myTargetHz = hz; }
-  uint32_t GetCurrentPeriod() const { return myCurrentPeriod; }
-  uint32_t GetCurrentFrequency() const {
-    return PrivPeriodToFrequency(myCurrentPeriod);
+  void Start();
+  void Stop();
+  bool Update();
+  void SetTargetHz(uint32_t aSpeedHz);
+  uint32_t GetCurrentPeriod() const {
+    if (myState == StepperState::STOPPED) {
+      return 0;
+    } else {
+      return myCurrentPeriod;
+    }
+  }
+  float GetCurrentFrequency() const {
+    if (myState == StepperState::STOPPED) {
+      return 0;
+    } else {
+      return PrivPeriodToFrequency(myCurrentPeriod);
+    }
   }
 
+  StepperState GetState() { return myState; }
+
 private:
-  void PrivSetEnabled(bool enabled);
   // Period calculation methods
-  int32_t PrivCalculateNextPeriod(uint32_t currentPeriod, float targetHz);
+  void TransitionTo(StepperState aState);
+  float PrivNearestPeriodToFrequency(float hz) const;
   uint32_t PrivFrequencyToPeriod(float hz) const;
   float PrivPeriodToFrequency(uint32_t period) const;
+  uint32_t PrivSecondsToPeriod(float seconds) const;
+  bool Step(StepperState state);
+
+  /**
+          @brief Calculate the time interval between the previous step and
+     this step
+          @param stepsPerRotation The number of steps per rotation of the
+     stepper motor
+          @param acceleration The acceleration of the stepper motor in steps
+     per divided clock cycle (not per second) (negative for deceleration)
+          @param previousInterval The previous interval in seconds
+          @return The next interval in seconds
+   */
+  uint32_t CalculateNextPeriod(int stepsPerRotation, uint32_t currentPeriod,
+                               int32_t accelerationStepsPerCyclequared);
 
   // Callbacks
   Callback myStoppedCallback;
@@ -42,30 +76,31 @@ private:
   Callback myAcceleratingCallback;
   Callback myDeceleratingCallback;
 
-  CallbackEvent myState;
-
-  // Program definition constants
-  static constexpr uint SIDESET_BITS = 1;
-  static constexpr uint WRAP_TARGET = 2;
-  static constexpr uint WRAP = 6;
+  StepperState myState;
 
   PIO myPio;
   uint mySm;
   uint myOffset;
   uint myStepPin;
+  bool mySmIsEnabled = false;
 
   uint32_t mySysClk;
-  float myConfiguredDiv;
-  uint myMaxSpeed;
+  uint myConfiguredPrescaler;
+  uint32_t myMinPeriod; // aka max speed
+  uint32_t myMaxPeriod; // aka minimum speed
   int myStepsPerRotation;
-  uint32_t myAcceleration;
-  uint32_t myDeceleration;
+  uint32_t
+      myAcccelerationCyclesPerPeriodChange; // in number of divided clock cycles
+                                            // per 1 integer period change
+  uint32_t
+      myDecelerationCyclesPerPeriodChange; // in number of divided clock cycles
+                                           // per 1 integer period change
   uint32_t myCurrentPeriod;
-  uint32_t myTargetHz;
-  bool myIsRunning;
-  uint32_t myStartSpeedHz;
+  uint32_t myTargetPeriod;
+  uint32_t myStartPeriod;
+  double myStepAngleRadians;
 
-  static constexpr double PI = 3.14159265358979323846;
+  const double PI = 3.14159265358979323846;
 };
 
 } // namespace PIOStepperSpeedController

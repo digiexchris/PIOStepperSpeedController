@@ -30,6 +30,9 @@ include(pico_sdk_import.cmake)
 
 project(hello_PIOStepperSpeedController C CXX ASM)
 
+set(CMAKE_BUILD_TYPE Debug)
+add_compile_options(-O0)
+
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 

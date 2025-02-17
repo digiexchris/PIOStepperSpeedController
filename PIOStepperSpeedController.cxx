@@ -3,36 +3,74 @@
 #include <cassert> // Needed for assert()
 #include <cmath>   // Needed for sqrt() and PI calculations
 #include <cstdint> // Needed for uint32_t, int32_t types
+#include <hardware/pio.h>
 
 namespace PIOStepperSpeedController {
-Stepper::Stepper(uint stepPin, uint startSpeedHz, uint maxSpeed,
-                 uint stepsPerRotation, uint acceleration, uint deceleration,
-                 Callback aStoppedCallback, Callback aCoastingCallback,
-                 Callback aAcceleratingCallback, Callback aDeceleratingCallback)
-    : myStepPin(stepPin), myStartSpeedHz(startSpeedHz), myIsRunning(false),
-      myTargetHz(0), myCurrentPeriod(0), myMaxSpeed(maxSpeed),
-      myStepsPerRotation(stepsPerRotation), myAcceleration(acceleration),
-      myDeceleration(deceleration), myOffset(0), mySysClk(0),
+Stepper::Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
+                 uint32_t stepsPerRotation, uint32_t acceleration,
+                 uint32_t deceleration, Callback aStoppedCallback,
+                 Callback aCoastingCallback, Callback aAcceleratingCallback,
+                 Callback aDeceleratingCallback)
+    : myStepPin(stepPin), myCurrentPeriod(0),
+      myStepsPerRotation(stepsPerRotation), myOffset(0), mySysClk(0),
       myStoppedCallback(aStoppedCallback),
       myCoastingCallback(aCoastingCallback),
       myAcceleratingCallback(aAcceleratingCallback),
       myDeceleratingCallback(aDeceleratingCallback) {
 
   assert(startSpeedHz > 0);
-  assert(maxSpeed > 0);
+  assert(maxSpeedHz > 0);
   assert(stepsPerRotation > 0);
   assert(acceleration > 0);
   assert(deceleration > 0);
-
-  mySysClk = clock_get_hz(clk_sys);
 
   // Configure state machine
   // Calculate clock divider: Keep the time range between 0 and 2^32-1 cycles
   // For timing calculation: period = (sysclk / div) / (2 * frequency)
   // Maximum period should be less than 2^32-1 (will be truncated to 32 bits)
   mySysClk = clock_get_hz(clk_sys);
-  myConfiguredDiv = std::max(1.0f, std::ceil(static_cast<float>(mySysClk) /
-                                             (2.0f * maxSpeed * (1ULL << 32))));
+  // At max speed (div=1): period = (sysclk/div)/(freq) = 12,500
+
+  // IMPORTANT: Periods are in clock cycles, not any time based unit such as
+  // seconds!!!!
+
+  // So I remember this:
+  // The resulting period is essentially p(clk*divisor) units.
+  // So, if we have a divisor of 2, and a sysclk of 125,000,000, and a period of
+  // 10, we have 10 divided clock cycles.
+
+  // example breakdown with 1 as a divisor and a 10khz frequency:
+  // sysclk = 125MHz = one cycle every 8ns
+  // sysclk period = 12,500 sysclk cycles
+  // real time = 12,500 * 8ns = 50µs
+
+  // So, if we have a divisor of 2, we have 12,500 * 2 = 25000 sysclk cycles
+  // real time = 25000 * 8ns = 200µs
+
+  // and floor it, can't go over uint32_max
+  // myConfiguredDiv = std::floor(maxDiv);
+  assert((mySysClk / 10000) == 12500); // This math works, right guys?
+  assert((mySysClk / 20000) == 6250);  // This math works, right guys?
+
+  myConfiguredPrescaler =
+      mySysClk / maxSpeedHz; // should give us a divider that gives us our max
+                             // speed with a period of 1
+
+  myMaxPeriod = mySysClk * ((1 / maxSpeedHz) / myConfiguredPrescaler);
+
+  // TODO that calculation is broke as, so:
+  // myConfiguredDiv = 12500;
+
+  // Convert acceleration from steps/s² to cycles per REAL LIFE integer period
+  // change Higher acceleration = fewer cycles between period changes eg: if
+  // this value is 10, then the PIO program requires 10 cycles to reduce
+  // the real time period the equivalent of by 1/(mySysClk/myConfiguredDiv) I
+  // think...
+  myAcccelerationCyclesPerPeriodChange =
+      static_cast<uint32_t>((mySysClk / myConfiguredPrescaler) / acceleration);
+
+  myDecelerationCyclesPerPeriodChange =
+      static_cast<uint32_t>((mySysClk / myConfiguredPrescaler) / deceleration);
 
   bool success = pio_claim_free_sm_and_add_program_for_gpio_range(
       &StepperSpeedController_program, &myPio, &mySm, &myOffset, stepPin, 1,
@@ -45,187 +83,279 @@ Stepper::Stepper(uint stepPin, uint startSpeedHz, uint maxSpeed,
 
   // SM configuration
   pio_sm_config c = StepperSpeedController_program_get_default_config(myOffset);
-  sm_config_set_wrap(&c, myOffset + WRAP_TARGET, myOffset + WRAP);
-  sm_config_set_sideset(&c, SIDESET_BITS, true, false);
   sm_config_set_sideset_pins(&c, stepPin);
-  sm_config_set_out_pins(&c, stepPin, 1);
-  sm_config_set_clkdiv(&c, myConfiguredDiv);
+  sm_config_set_clkdiv(&c, myConfiguredPrescaler);
 
   // Initialize and clear
   pio_sm_init(myPio, mySm, myOffset, &c);
   pio_sm_clear_fifos(myPio, mySm);
 
-  myState = CallbackEvent::STOPPED;
+  myState = StepperState::STOPPED;
+
+  myMinPeriod = 1;
+  myStartPeriod = PrivFrequencyToPeriod(startSpeedHz);
+  myStepAngleRadians = 2 * PI / myStepsPerRotation;
+  myCurrentPeriod = myStartPeriod;
 }
 
-void Stepper::Start(float targetHz) {
-  assert(targetHz > 0);
-  myTargetHz = targetHz;
-  if (myState != CallbackEvent::STOPPED) {
-    return;
-  }
+void Stepper::TransitionTo(StepperState aState) {
+  switch (aState) {
+  case StepperState::ACCELERATING:
+    if (myState != StepperState::ACCELERATING) {
+      myState = StepperState::ACCELERATING;
+      if (myAcceleratingCallback != nullptr) {
+        myAcceleratingCallback(CallbackEvent::ACCELERATING);
+      }
+    }
+    break;
 
-  myCurrentPeriod = PrivFrequencyToPeriod(myStartSpeedHz);
-  pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
-  // Jump to start of program (offset 0)
-  pio_sm_exec(myPio, mySm, pio_encode_jmp(myOffset));
-  pio_sm_set_enabled(myPio, mySm, true);
-}
-
-void Stepper::ForceStop() {
-  pio_sm_set_enabled(myPio, mySm, false);
-  gpio_put(myStepPin, 0);
-  myState = CallbackEvent::STOPPED;
-  if (myStoppedCallback != nullptr) {
-    myStoppedCallback(CallbackEvent::STOPPED);
-  }
-}
-
-bool Stepper::Step() {
-  if (myState == CallbackEvent::STOPPED) {
-    return false;
-  }
-
-  // Calculate next period using internal target_hz
-  int32_t nextPeriod = PrivCalculateNextPeriod(myCurrentPeriod, myTargetHz);
-
-  if (nextPeriod >= PrivFrequencyToPeriod(myStartSpeedHz)) {
-    ForceStop();
-    return false;
-  }
-
-  // todo: calculate this in the constructor instead and cache it
-  auto minPeriod = PrivFrequencyToPeriod(myMaxSpeed);
-
-  // it's gone as fast as it's configured to top out at, stop going faster
-  if (nextPeriod < minPeriod) {
-    nextPeriod = minPeriod;
-  }
-
-  // Check if we're coasting
-  else if (nextPeriod == myCurrentPeriod) {
-    if (myState != CallbackEvent::COASTING) {
-      myState = CallbackEvent::COASTING;
+  case StepperState::COASTING:
+    if (myState != StepperState::COASTING) {
+      myState = StepperState::COASTING;
       if (myCoastingCallback != nullptr) {
         myCoastingCallback(CallbackEvent::COASTING);
       }
     }
-  }
+    break;
 
-  else if (nextPeriod < myCurrentPeriod) {
-    if (myState != CallbackEvent::ACCELERATING) {
-      myState = CallbackEvent::ACCELERATING;
-      if (myDeceleratingCallback != nullptr) {
-        myDeceleratingCallback(CallbackEvent::ACCELERATING);
-      }
-    }
-  }
-
-  else if (nextPeriod > myCurrentPeriod) {
-
-    if (myState != CallbackEvent::DECELERATING) {
-      myState = CallbackEvent::DECELERATING;
+  case StepperState::DECELERATING:
+    if (myState != StepperState::DECELERATING) {
+      myState = StepperState::DECELERATING;
       if (myDeceleratingCallback != nullptr) {
         myDeceleratingCallback(CallbackEvent::DECELERATING);
       }
-    } else if (nextPeriod >= PrivFrequencyToPeriod(myTargetHz)) {
-      ForceStop();
+    }
+    break;
+
+  case StepperState::STARTING:
+    if (myState != StepperState::STARTING) {
+      myState = StepperState::STARTING;
+    }
+    break;
+
+  case StepperState::STOPPING:
+    if (myState != StepperState::STOPPING) {
+      myState = StepperState::STOPPING;
+    }
+    break;
+
+  case StepperState::STOPPED:
+    if (myState != StepperState::STOPPED) {
+      myState = StepperState::STOPPED;
+      if (myStoppedCallback != nullptr) {
+        myStoppedCallback(CallbackEvent::STOPPED);
+      }
+    }
+    break;
+  }
+}
+
+void Stepper::Stop() {
+  if (myState == StepperState::STOPPED || myState == StepperState::STOPPING) {
+    return;
+  }
+
+  myState = StepperState::STOPPING;
+}
+
+void Stepper::Start() {
+
+  if (!mySmIsEnabled) {
+    myCurrentPeriod = myStartPeriod;
+    pio_sm_set_enabled(myPio, mySm, true);
+    TransitionTo(StepperState::STARTING);
+    mySmIsEnabled = true;
+  }
+}
+
+bool Stepper::Update() {
+
+  if (!mySmIsEnabled) {
+    return false;
+  }
+
+  switch (myState) {
+  case StepperState::STOPPED:
+    return false;
+    break;
+  case StepperState::STOPPING:
+    if (myCurrentPeriod >= myStartPeriod) {
+      pio_sm_set_enabled(myPio, mySm, false);
+      mySmIsEnabled = false;
+      gpio_put(myStepPin, 0);
+      TransitionTo(StepperState::STOPPED);
+      return false;
+    } else {
+      return Step(StepperState::DECELERATING);
+    }
+    break;
+  case StepperState::STARTING:
+    if (myCurrentPeriod < myStartPeriod) {
+      TransitionTo(StepperState::ACCELERATING);
+      return Step(StepperState::ACCELERATING);
+    } else if (myCurrentPeriod <= myTargetPeriod) {
+      TransitionTo(StepperState::COASTING);
+      return Step(StepperState::COASTING);
+    } else {
+      TransitionTo(StepperState::ACCELERATING);
+      return Step(StepperState::STARTING);
+    }
+  case StepperState::ACCELERATING:
+    if (myCurrentPeriod > myTargetPeriod) {
+      return Step(StepperState::ACCELERATING);
+    } else {
+      TransitionTo(StepperState::COASTING);
+      return Step(StepperState::COASTING);
+    }
+    break;
+  case StepperState::COASTING:
+    if (myCurrentPeriod == myTargetPeriod) {
+      return Step(StepperState::COASTING);
+    } else {
+      // only thing that can result in a speed change after coasting is a
+      // SetTargetHz or Stop
       return false;
     }
+    break;
+  case StepperState::DECELERATING:
+    if (myCurrentPeriod < myTargetPeriod) {
+      return Step(StepperState::DECELERATING);
+    } else {
+      TransitionTo(StepperState::COASTING);
+      return Step(StepperState::COASTING);
+    }
+    break;
   }
 
-  // Update period and step
-  myCurrentPeriod = nextPeriod;
-  pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
-  return true;
+  return false;
 }
 
-void Stepper::PrivSetEnabled(bool enabled) {
-  pio_sm_set_enabled(myPio, mySm, enabled);
-  if (!enabled) {
-    gpio_put(myStepPin, 0);
+bool Stepper::Step(StepperState state) {
+
+  switch (state) {
+  case StepperState::STARTING: {
+    pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
+    return true;
+  } break;
+
+  case StepperState::ACCELERATING: {
+    int32_t nextPeriod =
+        CalculateNextPeriod(myStepsPerRotation, myCurrentPeriod,
+                            myAcccelerationCyclesPerPeriodChange);
+
+    if (nextPeriod <= myMinPeriod) {
+      myCurrentPeriod = myMinPeriod;
+      myTargetPeriod = myMinPeriod;
+    } else if (nextPeriod <= myTargetPeriod) {
+      myCurrentPeriod = myTargetPeriod;
+    } else {
+      myCurrentPeriod = nextPeriod;
+    }
+    pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
+    return true;
+  } break;
+
+  case StepperState::DECELERATING: {
+    int32_t nextPeriod = CalculateNextPeriod(
+        myStepsPerRotation,
+
+        myCurrentPeriod, -myAcccelerationCyclesPerPeriodChange);
+    myCurrentPeriod = nextPeriod;
+    if (nextPeriod >= myTargetPeriod) {
+      myCurrentPeriod = myTargetPeriod;
+    }
+
+    if (myCurrentPeriod >= myStartPeriod) {
+      myCurrentPeriod = myStartPeriod;
+    }
+
+    pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
+    return true;
   }
+
+  break;
+  case StepperState::COASTING: {
+    pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
+    return true;
+  } break;
+  default:
+    assert(false);
+  }
+  return false;
 }
 
-int32_t Stepper::PrivCalculateNextPeriod(uint32_t currentPeriod,
-                                         float targetHz) {
-  if (currentPeriod <= 0) {
-    // First interval calculation
-    double alpha = 2 * PI / myStepsPerRotation;
-    if (myAcceleration <= 0) {
-      return 0; // Prevent divide by zero
-    }
-    return (mySysClk / myConfiguredDiv) * std::sqrt(2 * alpha / myAcceleration);
-  }
+// todo unused and probably wrong
+uint32_t Stepper::PrivSecondsToPeriod(float seconds) const {
+  return seconds > 0 ? seconds * mySysClk / myConfiguredPrescaler
+                     : myStartPeriod;
+}
 
-  // Calculate current speed in Hz (protect against divide by zero)
-  if (currentPeriod == 0) {
-    return 0;
-  }
-  double currentHz = (mySysClk / myConfiguredDiv) / (2.0 * currentPeriod);
-
-  if (targetHz == 0) {
-    // Specifically handle stopping case
-    double currentHz = PrivPeriodToFrequency(currentPeriod);
-    if (currentHz <= 0.0f) {
-      return 0; // This will trigger a stop in the Step() function
-    }
-  }
-
-  // Determine if we need to accelerate or decelerate
-  if (currentHz > targetHz) {
-    // Need to decelerate - increase period
-    double alpha = 2 * PI / myStepsPerRotation;
-    double currentInterval = currentPeriod * myConfiguredDiv / mySysClk;
-    double radsPerSecondSquared =
-        myDeceleration * alpha; // Use deceleration value
-
-    if (alpha == 0) {
-      return currentPeriod; // Prevent divide by zero
-    }
-
-    double nextInterval =
-        currentInterval +
-        (2 * currentInterval * currentInterval * radsPerSecondSquared) / alpha;
-
-    // Check if we're stopping and would go below zero Hz
-    if (targetHz == 0) {
-      if (nextInterval <= 0) {
-        return currentPeriod; // Prevent divide by zero
-      }
-      double nextHz = mySysClk / (myConfiguredDiv * nextInterval * 2.0);
-      if (nextHz <= 0) {
-        return 0;
-      }
-    }
-
-    return (mySysClk / myConfiguredDiv) * nextInterval;
-  } else if (currentHz < targetHz) {
-    // Need to accelerate - decrease period
-    double alpha = 2 * PI / myStepsPerRotation;
-    if (alpha == 0) {
-      return currentPeriod; // Prevent divide by zero
-    }
-
-    double currentInterval = currentPeriod * myConfiguredDiv / mySysClk;
-    double radsPerSecondSquared = myAcceleration * alpha;
-
-    double nextInterval =
-        currentInterval -
-        (2 * currentInterval * currentInterval * radsPerSecondSquared) / alpha;
-
-    return (mySysClk / myConfiguredDiv) * nextInterval;
-  }
-
-  // At target speed - maintain current period
-  return currentPeriod;
+float Stepper::PrivNearestPeriodToFrequency(float hz) const {
+  float newPeriod =
+      (static_cast<float>(mySysClk) / (myConfiguredPrescaler)) / hz;
+  return std::round(newPeriod);
 }
 
 uint32_t Stepper::PrivFrequencyToPeriod(float hz) const {
-  return hz > 0 ? (mySysClk / (myConfiguredDiv * hz * 2)) : 0;
+  if (hz <= 0.0f) {
+    return myStartPeriod;
+  }
+
+  float speedRatio = myMaxPeriod / hz;
+
+  float newPeriod = static_cast<float>(mySysClk) / (myConfiguredPrescaler) / hz;
+
+  return static_cast<uint32_t>(std::floor(newPeriod));
 }
 
 float Stepper::PrivPeriodToFrequency(uint32_t period) const {
-  return period > 0 ? (mySysClk / (myConfiguredDiv * period * 2.0)) : 0;
+  if (period > 0 && period < UINT32_MAX) {
+    return static_cast<float>(mySysClk) / (myConfiguredPrescaler * period);
+  }
+  return 0;
 }
+
+void Stepper::SetTargetHz(uint32_t hz) {
+
+  if (hz == 0) {
+    myTargetPeriod = myStartPeriod;
+    return;
+  }
+
+  uint32_t targetPeriod = PrivNearestPeriodToFrequency(static_cast<float>(hz));
+
+  if (targetPeriod > myStartPeriod) {
+    targetPeriod = myStartPeriod;
+  }
+
+  if (targetPeriod < myCurrentPeriod) {
+    if (targetPeriod < myMinPeriod) {
+      targetPeriod = myMinPeriod;
+    }
+    if (myState != StepperState::STARTING &&
+        myState != StepperState::ACCELERATING) {
+      TransitionTo(StepperState::ACCELERATING);
+    }
+
+  }
+
+  else if (targetPeriod > myCurrentPeriod) {
+    if (myState != StepperState::DECELERATING) {
+      TransitionTo(StepperState::DECELERATING);
+    }
+  }
+
+  myTargetPeriod = targetPeriod;
+}
+
+uint32_t Stepper::CalculateNextPeriod(int stepsPerRotation,
+                                      uint32_t currentPeriod,
+                                      int32_t cyclesPerPeriodChange) {
+  if (cyclesPerPeriodChange == 0) {
+    return currentPeriod;
+  }
+
+  return currentPeriod - cyclesPerPeriodChange;
+}
+
 } // namespace PIOStepperSpeedController
