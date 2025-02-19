@@ -2,12 +2,15 @@ if(NOT DEFINED PICO_SDK_PATH)
     message(FATAL_ERROR "PICO_SDK_PATH must be defined before including this library")
 endif()
 
-
+# Option for building tests
+option(BUILD_TESTS "Build tests" OFF)
 
 # Create library target
 add_library(PIOStepperSpeedController
-${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.cxx
-${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.hxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.cxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.hxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/Converter.cxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/Converter.hxx
 )
 
 # Generate PIO header
@@ -24,3 +27,28 @@ target_include_directories(PIOStepperSpeedController PUBLIC
 target_link_libraries(PIOStepperSpeedController PUBLIC
     hardware_pio
 )
+
+if(BUILD_TESTS)
+    # Include FetchContent and get GTest
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.13.0.zip
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    # Create test executable
+    add_executable(converter_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/ConverterTest.cxx
+        ${CMAKE_CURRENT_SOURCE_DIR}/Converter.cxx
+    )
+
+    target_link_libraries(converter_tests PRIVATE
+        gtest
+        gtest_main
+    )
+
+    # Enable testing
+    enable_testing()
+    add_test(NAME converter_tests COMMAND converter_tests)
+endif()

@@ -7,18 +7,6 @@
 namespace PIOStepperSpeedController {
 class Stepper {
 public:
-  enum class CallbackEvent { STOPPED, ACCELERATING, DECELERATING, COASTING };
-
-  enum class StepperState {
-    STOPPED,
-    STOPPING,
-    STARTING,
-    ACCELERATING,
-    COASTING,
-    DECELERATING
-  };
-
-  using Callback = void (*)(CallbackEvent event);
 
   Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
           uint32_t stepsPerRotation, uint32_t acceleration,
@@ -75,7 +63,7 @@ private:
           @param previousInterval The previous interval in seconds
           @return The next interval in seconds
    */
-  uint32_t CalculateNextPeriod(int stepsPerRotation, uint32_t currentPeriod,
+  uint32_t CalculateNextFrequency(uint32_t currentPeriod,
                                int32_t accelerationStepsPerCyclequared);
 
   // Callbacks

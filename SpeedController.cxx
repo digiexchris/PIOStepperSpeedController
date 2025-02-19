@@ -47,11 +47,6 @@ Stepper::Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
   // So, if we have a divisor of 2, we have 12,500 * 2 = 25000 sysclk cycles
   // real time = 25000 * 8ns = 200µs
 
-  // and floor it, can't go over uint32_max
-  // myConfiguredDiv = std::floor(maxDiv);
-  assert((mySysClk / 10000) == 12500); // This math works, right guys?
-  assert((mySysClk / 20000) == 6250);  // This math works, right guys?
-
   // myConfiguredPrescaler =
   //     mySysClk / maxSpeedHz; // should give us a divider that gives us our
   //     max
@@ -104,76 +99,6 @@ Stepper::Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
   myStartPeriod = PrivFrequencyToPeriod(startSpeedHz);
   myStepAngleRadians = 2 * PI / myStepsPerRotation;
   myCurrentPeriod = myStartPeriod;
-}
-
-void Stepper::TransitionTo(StepperState aState) {
-  switch (aState) {
-  case StepperState::ACCELERATING:
-    if (myState != StepperState::ACCELERATING) {
-      myState = StepperState::ACCELERATING;
-      if (myAcceleratingCallback != nullptr) {
-        myAcceleratingCallback(CallbackEvent::ACCELERATING);
-      }
-    }
-    break;
-
-  case StepperState::COASTING:
-    if (myState != StepperState::COASTING) {
-      myState = StepperState::COASTING;
-      if (myCoastingCallback != nullptr) {
-        myCoastingCallback(CallbackEvent::COASTING);
-      }
-    }
-    break;
-
-  case StepperState::DECELERATING:
-    if (myState != StepperState::DECELERATING) {
-      myState = StepperState::DECELERATING;
-      if (myDeceleratingCallback != nullptr) {
-        myDeceleratingCallback(CallbackEvent::DECELERATING);
-      }
-    }
-    break;
-
-  case StepperState::STARTING:
-    if (myState != StepperState::STARTING) {
-      myState = StepperState::STARTING;
-    }
-    break;
-
-  case StepperState::STOPPING:
-    if (myState != StepperState::STOPPING) {
-      myState = StepperState::STOPPING;
-    }
-    break;
-
-  case StepperState::STOPPED:
-    if (myState != StepperState::STOPPED) {
-      myState = StepperState::STOPPED;
-      if (myStoppedCallback != nullptr) {
-        myStoppedCallback(CallbackEvent::STOPPED);
-      }
-    }
-    break;
-  }
-}
-
-void Stepper::Stop() {
-  if (myState == StepperState::STOPPED || myState == StepperState::STOPPING) {
-    return;
-  }
-
-  myState = StepperState::STOPPING;
-}
-
-void Stepper::Start() {
-
-  if (!mySmIsEnabled) {
-    myCurrentPeriod = myStartPeriod;
-    pio_sm_set_enabled(myPio, mySm, true);
-    TransitionTo(StepperState::STARTING);
-    mySmIsEnabled = true;
-  }
 }
 
 bool Stepper::Update() {
