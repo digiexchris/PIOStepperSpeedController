@@ -1,15 +1,18 @@
-.program StepperSpeedController
-.side_set 1 opt                    ; Use sideset for step pin
+.pio_version 0 ; only requires PIO version 0
 
+.program StepperSpeedController
 .wrap_target
-    pull noblock side 0
-    mov x, osr
-    mov y, isr
-countloop:
-    jmp x!=y noset
-    jmp skip side 1
-noset:
-    nop
-skip:
-    jmp y-- countloop
-.wrap
+pull noblock      ; If FIFO empty: keeps old OSR value
+    out y, 32        ; Always empties OSR into Y
+                     ; Y now holds our working value
+    mov x, y         ; Copy from Y (Y preserved) into X
+    set pins, 1   
+lp1:
+    jmp x-- lp1   ; go to lp1, decrement x after the jmp. repeat until X is 0
+    
+    mov x, y       ;Copy from Y again (Y still preserved)
+    set pins, 0  
+lp2:
+    jmp x-- lp2   ; Delay for the same number of cycles again for the low state
+    mov osr, y       ; Preserve Y in OSR before wrap in case the FIFO is empty
+.wrap             ; Blink forever!

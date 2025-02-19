@@ -52,14 +52,22 @@ Stepper::Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
   assert((mySysClk / 10000) == 12500); // This math works, right guys?
   assert((mySysClk / 20000) == 6250);  // This math works, right guys?
 
-  myConfiguredPrescaler =
-      mySysClk / maxSpeedHz; // should give us a divider that gives us our max
-                             // speed with a period of 1
+  // myConfiguredPrescaler =
+  //     mySysClk / maxSpeedHz; // should give us a divider that gives us our
+  //     max
+  // This gives a range of 1hz = UINT32_MAX,
+  myConfiguredPrescaler = 68.72f;
 
-  myMaxPeriod = mySysClk * ((1 / maxSpeedHz) / myConfiguredPrescaler);
+  // I THINK THIS CALCULATION IS WRONG <
+  //     1 / maxfreq = minPeriod,
+  //         1 / minfreq = maxPeriod
 
-  // TODO that calculation is broke as, so:
-  // myConfiguredDiv = 12500;
+  // myMaxPeriod = mySysClk * ((1 / minSpeedHz) / myConfiguredPrescaler);
+  // myMaxPeriod = std::min(myMaxPeriod, UINT32_MAX);
+  myMaxPeriod = UINT32_MAX; //(1hz)
+
+  myMinPeriod = mySysClk * ((1 / maxSpeedHz) / myConfiguredPrescaler);
+  myMinPeriod = std::max(myMinPeriod, 1); // 227,389.73hz
 
   // Convert acceleration from steps/s² to cycles per REAL LIFE integer period
   // change Higher acceleration = fewer cycles between period changes eg: if
@@ -92,7 +100,7 @@ Stepper::Stepper(uint32_t stepPin, uint32_t startSpeedHz, uint32_t maxSpeedHz,
 
   myState = StepperState::STOPPED;
 
-  myMinPeriod = 1;
+  // myMinPeriod = 1;
   myStartPeriod = PrivFrequencyToPeriod(startSpeedHz);
   myStepAngleRadians = 2 * PI / myStepsPerRotation;
   myCurrentPeriod = myStartPeriod;

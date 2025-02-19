@@ -46,6 +46,14 @@ public:
     }
   }
 
+  float GetTargetFrequency() const {
+    if (myState == StepperState::STOPPED) {
+      return 0;
+    } else {
+      return PrivPeriodToFrequency(myTargetPeriod);
+    }
+  }
+
   StepperState GetState() { return myState; }
 
 private:
@@ -85,7 +93,7 @@ private:
   bool mySmIsEnabled = false;
 
   uint32_t mySysClk;
-  uint myConfiguredPrescaler;
+  float myConfiguredPrescaler;
   uint32_t myMinPeriod; // aka max speed
   uint32_t myMaxPeriod; // aka minimum speed
   int myStepsPerRotation;

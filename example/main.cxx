@@ -17,6 +17,8 @@
 #include "pico/stdlib.h"
 
 #include <PIOStepperSpeedController.hxx>
+#include <format>
+#include <iostream>
 
 using namespace PIOStepperSpeedController;
 
@@ -46,7 +48,7 @@ struct Sequence {
   uint32_t targetSpeed[2] = {0, 0};
 };
 
-Sequence sequence;
+Sequence *sequence = new Sequence();
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -78,45 +80,59 @@ int main() {
 
   float speed = 0;
 
+  int count = 0;
+
   // quick! you! give me a random number between 10 and 10000!
   // the stepper will not exceed the configured max speed, so
   // it will coast at the lower of either the set target speed,
   // or the max speed. So, I'll just min() that so that the
   // example continues to run
 
-  sequence.targetSpeed[0] = dist(gen);
-  sequence.targetSpeed[1] = dist(gen);
+  sequence->targetSpeed[0] = 5000;
+  sequence->targetSpeed[1] = 7000;
 
-  stepper->SetTargetHz(sequence.targetSpeed[0]);
-  sequence.nextPhase = 1;
+  stepper->SetTargetHz(sequence->targetSpeed[1000]);
+  sequence->nextPhase = 0;
   stepper->Start();
   while (true) {
 
-    // Get some info from the stepper and command it to do things
-    speed = stepper->GetCurrentFrequency();
-    state = stepper->GetState();
-    switch (state) {
-    case Stepper::StepperState::ACCELERATING:
-      printf("Stepper is accelerating\n");
-      break;
-    case Stepper::StepperState::COASTING:
-      printf("Stepper is coasting\n");
-      break;
-    case Stepper::StepperState::DECELERATING:
-      printf("Stepper is decelerating\n");
-      break;
-    case Stepper::StepperState::STARTING:
-      printf("Stepper is starting\n");
-      break;
-    case Stepper::StepperState::STOPPING:
-      printf("Stepper is stopping\n");
-      break;
-    case Stepper::StepperState::STOPPED:
-      printf("Stepper is stopped\n");
-      break;
+    count++;
+    if (count >= 100) {
+      count = 0;
+      // Get some info from the stepper and command it to do things
+      speed = stepper->GetCurrentFrequency();
+      state = stepper->GetState();
+      switch (state) {
+      case Stepper::StepperState::ACCELERATING:
+        printf("Stepper is accelerating\n");
+        break;
+      case Stepper::StepperState::COASTING:
+        printf("Stepper is coasting\n");
+        break;
+      case Stepper::StepperState::DECELERATING:
+        printf("Stepper is decelerating\n");
+        break;
+      case Stepper::StepperState::STARTING:
+        printf("Stepper is starting\n");
+        break;
+      case Stepper::StepperState::STOPPING:
+        printf("Stepper is stopping\n");
+        break;
+      case Stepper::StepperState::STOPPED:
+        printf("Stepper is stopped\n");
+        break;
+      }
+
+      auto currentHz = stepper->GetCurrentFrequency();
+      auto targetHz = stepper->GetTargetFrequency();
+      std::cout << "Current Hz: " << currentHz << " Target Hz: " << targetHz
+                << "\n";
     }
-    printf("Current Speed: %d Target Speed1: %d Target Speed 2: %d\n", speed,
-           sequence.targetSpeed[0], sequence.targetSpeed[1]);
+
+    // auto msg = std::format("Current Hz: {:.2f} Target Hz: {:.2f}\n",
+    // currentHz,
+    //                        targetHz);
+    // printf(msg);
 
     // maintain the internal state of the stepper. Call this as fast as possible
     // and this will block until the step is complete.
@@ -127,9 +143,9 @@ int main() {
     aStepOccurred = stepper->Update();
 
     tight_loop_contents();
-    sleep_us(1000); // just doing this so tinyusb can maintain the serial
-                    // output, normally I use freertos tasks and follow the
-                    // above note about timing
+    sleep_ms(10); // just doing this so tinyusb can maintain the serial
+                  // output, normally I use freertos tasks and follow the
+                  // above note about timing
   }
 }
 
@@ -145,24 +161,24 @@ int main() {
 void aStoppedCallback(Stepper::CallbackEvent event) {
   printf("Stopped Callback called\n");
   __breakpoint();
-  sequence.nextPhase = 1;
-  sequence.targetSpeed[0] = dist(gen);
-  sequence.targetSpeed[1] = dist(gen);
-  stepper->SetTargetHz(sequence.targetSpeed[0]);
+  sequence->nextPhase = 1;
+  sequence->targetSpeed[0] = dist(gen);
+  sequence->targetSpeed[1] = dist(gen);
+  stepper->SetTargetHz(sequence->targetSpeed[0]);
   stepper->Start();
   sleep_ms(500);
 }
 void aCoastingCallback(Stepper::CallbackEvent event) {
   printf("Coasting Callback called\n");
-  __breakpoint();
-  switch (sequence.nextPhase) {
+  //__breakpoint();
+  switch (sequence->nextPhase) {
   case 0:
-    stepper->SetTargetHz(sequence.targetSpeed[1]);
-    sequence.nextPhase = 1;
+    stepper->SetTargetHz(sequence->targetSpeed[0]);
+    sequence->nextPhase = 1;
     break;
   case 1:
-    stepper->SetTargetHz(sequence.targetSpeed[0]);
-    sequence.nextPhase = 2;
+    stepper->SetTargetHz(sequence->targetSpeed[1]);
+    sequence->nextPhase = 2;
     break;
   case 2:
     stepper->Stop();
@@ -173,12 +189,12 @@ void aCoastingCallback(Stepper::CallbackEvent event) {
 
 void aAcceleratingCallback(Stepper::CallbackEvent event) {
   printf("Accelerating Callback called\n");
-  __breakpoint();
+  //__breakpoint();
   sleep_ms(500);
 }
 
 void aDeceleratingCallback(Stepper::CallbackEvent event) {
   printf("Decelerating Callback Called\n");
-  __breakpoint();
+  //__breakpoint();
   sleep_ms(500);
 }
