@@ -9,15 +9,12 @@ namespace PIOStepperSpeedController {
 
 template <typename T>
 concept Stepper = requires(T stepper) {
-  {stepper.StartImpl()};
-  {stepper.StopImpl()};
-  { stepper.UpdateImpl() } -> std::convertible_to<bool>;
-  {stepper.SetTargetHzImpl(uint32_t aTargetHz)};
-  { stepper.GetCurrentPeriodImpl() } -> std::convertible_to<uint32_t>;
-  { stepper.GetCurrentFrequencyImpl() } -> std::floating_point;
-  { stepper.GetTargetFrequencyImpl() } -> std::floating_point;
+  {stepper.EnableImpl()};
+  {stepper.DisableImpl()};
+  {stepper.PutStep(uint32_t aPeriod)};
+  ->std::convertable_to<bool>;
 }
-&&std::derived_from<T, Stepper>;
+&&std::derived_from<IStepper>;
 
 class IStepper {
 
@@ -44,6 +41,7 @@ public:
 
   void Start();
   void Stop();
+  void Step(StepperState state);
   bool Update();
   void SetTargetHz(uint32_t aSpeedHz);
   uint32_t GetCurrentPeriod() const;
@@ -53,6 +51,7 @@ public:
 
 private:
   void TransitionTo(StepperState aState);
+  Converter myConverter;
   uint32_t myAcceleration;
   uint32_t myDeceleration;
   uint32_t mySysClk;
@@ -62,7 +61,12 @@ private:
   Callback myAcceleratingCallback;
   Callback myDeceleratingCallback;
   StepperState myState;
-  Converter myConverter;
+
+  uint32_t myCurrentPeriod;
+  uint32_t myTargetPeriod;
+  uint32_t myStartPeriod;
+  uint32_t myMaxPeriod;
+  uint32_t myMinPeriod;
 };
 
 } // namespace PIOStepperSpeedController

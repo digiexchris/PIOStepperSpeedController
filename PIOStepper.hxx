@@ -16,16 +16,19 @@ public:
              Callback aAcceleratingCallback = nullptr,
              Callback aDeceleratingCallback = nullptr);
 
-  void StartImpl() override;
-  void StopImpl() override;
-  bool UpdateImpl() override;
-  void SetTargetHzImpl(uint32_t aTargetHz) override;
-  uint32_t GetCurrentPeriodImpl() override;
-  float GetCurrentFrequencyImpl() override;
-  float GetTargetFrequencyImpl() override;
+  void EnableImpl();
+  void DisableImpl();
+  bool UpdateImpl();
+  void SetTargetHzImpl(uint32_t aTargetHz);
+  uint32_t GetCurrentPeriodImpl();
+  float GetCurrentFrequencyImpl();
+  float GetTargetFrequencyImpl();
 
 private:
-  uint32_t myStepPin;
+  PIO myPio;
+  uint mySm;
+  uint myOffset;
+  uint myStepPin;
 };
 
 } // namespace PIOStepperSpeedController

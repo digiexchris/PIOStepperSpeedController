@@ -69,3 +69,18 @@ PIOStepper::PIOStepper(uint32_t stepPin, uint32_t startSpeedHz,
   myStepAngleRadians = 2 * PI / myStepsPerRotation;
   myCurrentPeriod = myStartPeriod;
 }
+
+void PIOStepper::EnableImpl() { pio_sm_set_enabled(myPio, mySm, true); }
+
+void PIOStepper::DisableImpl() {
+  pio_sm_set_enabled(myPio, mySm, false);
+  gpio_put(myStepPin, 0);
+}
+
+bool PIOStepper::Step(StepperState state) {}
+
+void Stepper::PutStep(uint32_t aPeriod) {
+  pio_sm_put_blocking(myPio, mySm, myCurrentPeriod);
+}
+
+} // namespace PIOStepperSpeedController
