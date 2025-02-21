@@ -35,22 +35,79 @@ TEST(ConverterTest, PrescalerEffects) {
 
 TEST(ConverterTest, CalculateNextFrequency) {
   Converter conv(100000000, 1);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100000000, 0), 1.0f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000000, 0), 100.0f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100000000, 1000000), 0.99f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000000, 1000000), 99.0f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100000000, -1000000), 1.01f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000000, -1000000), 101.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 0), 1.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 0), 100.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 1000), 1001.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 1000), 110.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -100), 999.9f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -1000), 999.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -2000), 998.0f);
 
   conv = Converter(100000000, 10);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(10000000, 0), 1.0f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100000, 0), 100.0f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(10000000, 100000), 0.99f);
-  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100000, 100000), 99.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 0), 1.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 0), 100.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 1000), 1001.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 1000), 110.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -100), 999.9f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -1000), 999.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -2000), 998.0f);
 
   conv = Converter(100000000, 33);
-  EXPECT_NEAR(conv.CalculateNextFrequency(3030303, 0), 1.0f, 0.01);
-  EXPECT_NEAR(conv.CalculateNextFrequency(30303, 0), 100.0f, 0.01);
-  EXPECT_NEAR(conv.CalculateNextFrequency(3030303, 30303), 0.99f, 0.01);
-  EXPECT_NEAR(conv.CalculateNextFrequency(30303, 30303), 99.0f, 0.01);
+  EXPECT_NEAR(conv.CalculateNextFrequency(1, 0), 1.0f, 0.1f);
+  EXPECT_NEAR(conv.CalculateNextFrequency(100, 0), 100.0f, 0.1f);
+  EXPECT_NEAR(conv.CalculateNextFrequency(1, 1000), 1001.0f, 0.1f);
+  EXPECT_NEAR(conv.CalculateNextFrequency(100, 1000), 110.0f, 0.1f);
+  EXPECT_NEAR(conv.CalculateNextFrequency(1000, -100), 999.9f, 0.1f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -1000), 999.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -2000), 998.0f);
+
+  conv = Converter(125000000, 1);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 0), 1.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 0), 100.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 1000), 1001.0f);
+}
+
+TEST(ConverterTest, AccelerateFrom1HzTo2001Hz) {
+  Converter conv = Converter(125000000, 1);
+  float nextFreq = 1.0f;
+  float targetFreq = 2001.0f;
+  int iterations = 0;
+
+  while (nextFreq < targetFreq) {
+    nextFreq = conv.CalculateNextFrequency(nextFreq, 1000);
+    iterations++;
+  }
+
+  int expectedIterations = 1502; // From 125000 * ln(2001)
+  EXPECT_EQ(iterations, expectedIterations);
+  EXPECT_NEAR(nextFreq, 2001, 0.2f);
+}
+
+TEST(ConverterTest, AccelerateFrom100HzTo3333Hz) {
+  Converter conv = Converter(125000000, 1);
+  float nextFreq = 100.0f;
+  float targetFreq = 3333.0f;
+  int iterations = 0;
+  float lastFreq = nextFreq;
+
+  while (nextFreq < targetFreq) {
+    lastFreq = nextFreq;
+    nextFreq = conv.CalculateNextFrequency(nextFreq, 100);
+    iterations++;
+  }
+
+  /*
+  df = acceleration * ((sysclk/(prescaler * f)) * prescaler / sysclk)
+         = acceleration * (1/f)
+
+  N = ∫(f_start→f_end) df/(acceleration/f)
+  = ∫(f_start→f_end) f/acceleration df
+  = (1/acceleration) * ∫(f_start→f_end) f df
+  = (1/acceleration) * [f²/2]₍₁₀₀→₃₃₃₃₎
+  = (1/100) * (3333² - 100²)/2
+  ≈ 55,494
+  */
+  int expectedIterations = 55494;
+  EXPECT_EQ(iterations, expectedIterations);
+  EXPECT_NEAR(nextFreq, 3333, 0.1f);
 }

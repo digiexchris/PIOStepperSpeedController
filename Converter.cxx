@@ -11,7 +11,7 @@ Converter::Converter(uint32_t aSysClk, uint32_t aPrescaler) {
   myPrescaler = aPrescaler;
 }
 
-uint32_t Converter::ToPeriod(float aFrequencyHz) {
+uint32_t Converter::ToPeriod(float aFrequencyHz) const {
   if (aFrequencyHz <= 0) {
     throw std::invalid_argument("Frequency must be positive");
   }
@@ -19,21 +19,33 @@ uint32_t Converter::ToPeriod(float aFrequencyHz) {
                                aFrequencyHz);
 }
 
-float Converter::ToFrequency(uint32_t aPeriodTicks) {
+float Converter::ToFrequency(uint32_t aPeriodTicks) const {
   if (aPeriodTicks == 0) {
     throw std::invalid_argument("Period cannot be zero");
   }
   return static_cast<float>(mySysClk) / (myPrescaler * aPeriodTicks);
 }
 
-float Converter::CalculateNextFrequency(uint32_t aCurrentPeriod,
-                                        int32_t anAcceleration) {
+/*
+df = acceleration * ((sysclk/(prescaler * f)) * prescaler / sysclk)
+         = acceleration * (1/f)
+ */
+float Converter::CalculateNextFrequency(float currentFrequency,
+                                        int32_t anAcceleration) const {
   if (anAcceleration == 0) {
-    return ToFrequency(aCurrentPeriod);
+    return currentFrequency;
   }
 
-  return ToFrequency(aCurrentPeriod) -
-         (static_cast<float>(anAcceleration) / aCurrentPeriod);
-}
+  // Convert frequency to period in ticks
+  uint32_t currentPeriodTicks = ToPeriod(currentFrequency);
 
+  // Calculate time for one period in seconds
+  float periodInSeconds =
+      static_cast<float>(currentPeriodTicks * myPrescaler) / mySysClk;
+
+  // Calculate frequency change for this period
+  float deltaFreq = static_cast<float>(anAcceleration) * periodInSeconds;
+
+  return currentFrequency + deltaFreq;
+}
 } // namespace PIOStepperSpeedController

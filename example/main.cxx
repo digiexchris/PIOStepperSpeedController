@@ -103,22 +103,22 @@ int main() {
       speed = stepper->GetCurrentFrequency();
       state = stepper->GetState();
       switch (state) {
-      case Stepper::StepperState::ACCELERATING:
+      case StepperState::ACCELERATING:
         printf("Stepper is accelerating\n");
         break;
-      case Stepper::StepperState::COASTING:
+      case StepperState::COASTING:
         printf("Stepper is coasting\n");
         break;
-      case Stepper::StepperState::DECELERATING:
+      case StepperState::DECELERATING:
         printf("Stepper is decelerating\n");
         break;
-      case Stepper::StepperState::STARTING:
+      case StepperState::STARTING:
         printf("Stepper is starting\n");
         break;
-      case Stepper::StepperState::STOPPING:
+      case StepperState::STOPPING:
         printf("Stepper is stopping\n");
         break;
-      case Stepper::StepperState::STOPPED:
+      case StepperState::STOPPED:
         printf("Stepper is stopped\n");
         break;
       }

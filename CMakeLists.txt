@@ -5,12 +5,17 @@ endif()
 # Option for building tests
 option(BUILD_TESTS "Build tests" OFF)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Create library target
 add_library(PIOStepperSpeedController
     ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.hxx
     ${CMAKE_CURRENT_SOURCE_DIR}/Converter.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/Converter.hxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/Stepper.hxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/Stepper.cxx
 )
 
 # Generate PIO header
