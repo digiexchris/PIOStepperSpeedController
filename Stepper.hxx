@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Converter.hxx"
+#include <algorithm>
 #include <concepts>
 #include <cstdint>
 
@@ -23,18 +24,57 @@ using Callback = void (*)(CallbackEvent event);
 template <typename Derived> class Stepper;
 
 template <typename Derived>
-concept StepperImpl = requires(Derived stepper, uint32_t aPeriod) {
+concept StepperImpl = requires(Derived stepper, uint32_t aFrequency) {
   {stepper.EnableImpl()};
   {stepper.DisableImpl()};
-  { stepper.PutStep(aPeriod) } -> std::convertible_to<bool>;
+  { stepper.PutStep(aFrequency) } -> std::convertible_to<bool>;
 }
 &&std::derived_from<Derived, Stepper<Derived>>;
 
 template <typename Derived> class Stepper {
 public:
-  Stepper(uint32_t aAcceleration = 1000, uint32_t aDeceleration = 1000,
-          uint32_t aSysClk = 125000000, uint32_t aPrescaler = 1,
-          Callback aStoppedCallback = nullptr,
+  /**
+  @brief Constructor for the Stepper class
+  @param aMinSpeed Minimum speed in Hz
+  Note: aMinSpeed impacts how long the first
+  step takes. eg. 0.33hz will mean the first step takes 3.03 seconds regardless
+  of acceleration! 4hz will take 0.25 seconds for the first step so is a
+  reasonable starting speed for a human controlled power feed. It MUST be
+  greater than 0.
+  @param aMaxSpeed Maximum speed in Hz
+  aMaxSpeed will be capped by the maximum possible speed provided by the clock
+  speed and prescaler values if aMaxSpeed is greater than the maximum possible
+  speed of the pio state machine for that configuration.
+  @param aAcceleration Acceleration in Hz/s
+  @param aDeceleration Deceleration in Hz/s. It is perfectly valid for
+  deceleration and acceleration to match, but they must both be greater than
+  zero.
+  @param aSysClk System clock frequency in Hz. The RP2040 can go up to
+  133,000,000, 125,000,000 is a common value and is the default. You may pass in
+  what your system is configured for, but if you change this from how your
+  system is configured, the math will be wrong. this does NOT configure your
+  sysclk.
+  @param aPrescaler Prescaler value. With a prescaler of 1, the system can
+  operate at around 10,000 hz. Increase the prescaler if you need to go faster.
+  See the Converter class for the formula. This configures the divisor for the
+  pio state machine.
+
+  Callbacks should be a reference to a function with a Callback signiture, eg.
+  void (*)(CallbackEvent event); When the callback is called, it will pass in
+  which callback event occurred.
+
+  @param aStoppedCallback Callback function for stopped state. Optional, for
+  your use. It will be called when the state machine stops.
+  @param aCoastingCallback Callback function for coasting state. Optional, for
+  your use. It will be called when the stepper is coasting.
+  @param aAcceleratingCallback Callback function for accelerating state.
+  Optional, for your use. It will be called when the stepper is accelerating.
+  @param aDeceleratingCallback Callback function for decelerating state.
+  Optional, for your use. It will be called when the stepper is decelerating.
+  */
+  Stepper(float aMinSpeed, float aMaxSpeed, uint32_t aAcceleration,
+          uint32_t aDeceleration, uint32_t aSysClk = 125000000,
+          uint32_t aPrescaler = 1, Callback aStoppedCallback = nullptr,
           Callback aCoastingCallback = nullptr,
           Callback aAcceleratingCallback = nullptr,
           Callback aDeceleratingCallback = nullptr)
@@ -46,20 +86,18 @@ public:
         myDeceleratingCallback(aDeceleratingCallback),
         myState(StepperState::STOPPED) {
     myConverter = Converter(mySysClk, myPrescaler);
-    myMinPeriod = 1;
-    myMaxPeriod = UINT32_MAX - 1;
-    myMinFrequency = 1;
-    myMaxFrequency = myConverter.ToFrequency(myMinPeriod);
-    myCurrentPeriod = myMaxPeriod;
-    myTargetPeriod = myMaxPeriod;
+    myMinFrequency =
+        std::max(myConverter.ToFrequency(UINT32_MAX - 1), aMinSpeed);
+    myMaxFrequency = std::min(myConverter.ToFrequency(1), aMaxSpeed);
+    myCurrentFrequency = myMinFrequency;
+    myTargetFrequency = myMinFrequency;
     myIsRunning = false;
-    YOU WERE CONVERTING PERIOD TO FREQUENCY
   }
 
   void Start() {
 
     if (!myIsRunning) {
-      myCurrentPeriod = myMaxPeriod;
+      myCurrentFrequency = myMinFrequency;
       static_cast<Derived *>(this)->EnableImpl();
       TransitionTo(StepperState::STARTING);
       myIsRunning = true;
@@ -69,6 +107,8 @@ public:
     if (myState == StepperState::STOPPED || myState == StepperState::STOPPING) {
       return;
     }
+
+    myTargetFrequency = myMinFrequency;
 
     myState = StepperState::STOPPING;
   }
@@ -83,7 +123,7 @@ public:
       return false;
       break;
     case StepperState::STOPPING:
-      if (myCurrentPeriod >= myMaxPeriod) {
+      if (myCurrentFrequency <= myMinFrequency) {
         myIsRunning = false;
         static_cast<Derived *>(this)->DisableImpl();
         TransitionTo(StepperState::STOPPED);
@@ -93,19 +133,19 @@ public:
       }
       break;
     case StepperState::STARTING:
-      if (myCurrentPeriod > myTargetPeriod) {
+      if (myCurrentFrequency < myTargetFrequency) {
         TransitionTo(StepperState::ACCELERATING);
         Step(StepperState::ACCELERATING);
-      } else if (myCurrentPeriod <= myTargetPeriod) {
+      } else if (myCurrentFrequency == myTargetFrequency) {
         TransitionTo(StepperState::COASTING);
         Step(StepperState::COASTING);
       } else {
-        TransitionTo(StepperState::ACCELERATING);
-        Step(StepperState::STARTING);
+        TransitionTo(StepperState::DECELERATING);
+        Step(StepperState::DECELERATING);
       }
       break;
     case StepperState::ACCELERATING:
-      if (myCurrentPeriod > myTargetPeriod) {
+      if (myCurrentFrequency < myTargetFrequency) {
         Step(StepperState::ACCELERATING);
       } else {
         TransitionTo(StepperState::COASTING);
@@ -113,7 +153,7 @@ public:
       }
       break;
     case StepperState::COASTING:
-      if (myCurrentPeriod == myTargetPeriod) {
+      if (myCurrentFrequency == myTargetFrequency) {
         Step(StepperState::COASTING);
       } else {
         // only thing that can result in a speed change after coasting is a
@@ -122,7 +162,7 @@ public:
       }
       break;
     case StepperState::DECELERATING:
-      if (myCurrentPeriod < myTargetPeriod) {
+      if (myCurrentFrequency > myTargetFrequency) {
         Step(StepperState::DECELERATING);
       } else {
         TransitionTo(StepperState::COASTING);
@@ -136,15 +176,15 @@ public:
 
   void SetTargetHz(uint32_t aSpeedHz) {
     if (aSpeedHz == 0) {
-      myTargetPeriod = myMaxPeriod;
+      myTargetFrequency = myCurrentFrequency;
       return;
     }
 
-    uint32_t targetPeriod = myConverter.ToPeriod(static_cast<float>(aSpeedHz));
+    myTargetFrequency = aSpeedHz;
 
-    if (targetPeriod < myCurrentPeriod) {
-      if (targetPeriod < myMinPeriod) {
-        targetPeriod = myMinPeriod;
+    if (myTargetFrequency > myCurrentFrequency) {
+      if (myTargetFrequency > myMaxFrequency) {
+        myTargetFrequency = myMaxFrequency;
       }
       if (myState != StepperState::STARTING &&
           myState != StepperState::ACCELERATING) {
@@ -153,20 +193,18 @@ public:
 
     }
 
-    else if (targetPeriod > myCurrentPeriod) {
+    else if (myTargetFrequency < myCurrentFrequency) {
       if (myState != StepperState::DECELERATING) {
         TransitionTo(StepperState::DECELERATING);
       }
     }
-
-    myTargetPeriod = targetPeriod;
   }
 
   uint32_t GetCurrentPeriod() const {
     if (myState == StepperState::STOPPED) {
       return 0;
     } else {
-      return myCurrentPeriod;
+      return myConverter.ToPeriod(myCurrentFrequency);
     }
   }
 
@@ -174,7 +212,7 @@ public:
     if (myState == StepperState::STOPPED) {
       return 0;
     } else {
-      return myConverter.ToFrequency(myCurrentPeriod);
+      return myCurrentFrequency;
     }
   }
 
@@ -182,7 +220,7 @@ public:
     if (myState == StepperState::STOPPED) {
       return 0;
     } else {
-      return myConverter.ToFrequency(myTargetPeriod);
+      return myTargetFrequency;
     }
   }
   StepperState GetState() { return myState; }
@@ -191,45 +229,45 @@ private:
   bool Step(StepperState aState) {
     switch (aState) {
     case StepperState::STARTING: {
-      static_cast<Derived *>(this)->PutStep(myCurrentPeriod);
+      static_cast<Derived *>(this)->PutStep(myCurrentFrequency);
       return true;
     } break;
 
     case StepperState::ACCELERATING: {
-      int32_t nextPeriod = myConverter.ToPeriod(
-          myConverter.CalculateNextFrequency(myCurrentPeriod, myAcceleration));
+      float nextFrequency = myConverter.CalculateNextFrequency(
+          myCurrentFrequency, myAcceleration);
 
-      if (nextPeriod <= myMinPeriod) {
-        myCurrentPeriod = myMinPeriod;
-        myTargetPeriod = myMinPeriod;
-      } else if (nextPeriod <= myTargetPeriod) {
-        myCurrentPeriod = myTargetPeriod;
+      if (nextFrequency >= myMaxFrequency) {
+        myCurrentFrequency = myMaxFrequency;
+        myTargetFrequency = myMaxFrequency;
+      } else if (nextFrequency >= myTargetFrequency) {
+        myCurrentFrequency = myTargetFrequency;
       } else {
-        myCurrentPeriod = nextPeriod;
+        myCurrentFrequency = nextFrequency;
       }
-      static_cast<Derived *>(this)->PutStep(myCurrentPeriod);
+      static_cast<Derived *>(this)->PutStep(myCurrentFrequency);
       return true;
     } break;
 
     case StepperState::DECELERATING: {
-      int32_t nextPeriod = myConverter.ToPeriod(
-          myConverter.CalculateNextFrequency(myCurrentPeriod, -myDeceleration));
-      myCurrentPeriod = nextPeriod;
-      if (nextPeriod >= myTargetPeriod) {
-        myCurrentPeriod = myTargetPeriod;
+      float nextFrequency = myConverter.CalculateNextFrequency(
+          myCurrentFrequency, -myDeceleration);
+      myCurrentFrequency = nextFrequency;
+      if (nextFrequency <= myTargetFrequency) {
+        myCurrentFrequency = myTargetFrequency;
       }
 
-      if (myCurrentPeriod >= myMaxPeriod) {
-        myCurrentPeriod = myMaxPeriod;
+      if (myCurrentFrequency <= myMinFrequency) {
+        myCurrentFrequency = myMinFrequency;
       }
 
-      static_cast<Derived *>(this)->PutStep(myCurrentPeriod);
+      static_cast<Derived *>(this)->PutStep(myCurrentFrequency);
       return true;
     }
 
     break;
     case StepperState::COASTING: {
-      static_cast<Derived *>(this)->PutStep(myCurrentPeriod);
+      static_cast<Derived *>(this)->PutStep(myCurrentFrequency);
       return true;
     } break;
     default:
@@ -237,6 +275,7 @@ private:
     }
     return false;
   }
+
   void TransitionTo(StepperState aState) {
     switch (aState) {
     case StepperState::ACCELERATING:
@@ -302,13 +341,14 @@ private:
   uint32_t myDeceleration;
   uint32_t mySysClk;
   uint32_t myPrescaler;
-  uint32_t myCurrentPeriod;
-  uint32_t myTargetPeriod;
-  uint32_t myMaxPeriod;
-  uint32_t myMinPeriod;
+  // uint32_t myCurrentPeriod;
+  // uint32_t myTargetPeriod;
+  // uint32_t myMaxPeriod;
+  // uint32_t myMinPeriod;
   float myMaxFrequency;
   float myMinFrequency;
   float myCurrentFrequency;
+  float myTargetFrequency;
 
   // 1-byte members
   StepperState myState;

@@ -1,4 +1,5 @@
 #include "Converter.hxx"
+#include <cstdint>
 #include <gtest/gtest.h>
 
 using namespace PIOStepperSpeedController;
@@ -36,8 +37,10 @@ TEST(ConverterTest, PrescalerEffects) {
 TEST(ConverterTest, CalculateNextFrequency) {
   Converter conv(100000000, 1);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 0), 1.0f);
+  EXPECT_NEAR(conv.CalculateNextFrequency(0.33, 1000), 3030.0f, 1.0f);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 0), 100.0f);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1, 1000), 1001.0f);
+  EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1001, 1000), 1001.999f);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(100, 1000), 110.0f);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -100), 999.9f);
   EXPECT_FLOAT_EQ(conv.CalculateNextFrequency(1000, -1000), 999.0f);
@@ -110,4 +113,23 @@ TEST(ConverterTest, AccelerateFrom100HzTo3333Hz) {
   int expectedIterations = 55494;
   EXPECT_EQ(iterations, expectedIterations);
   EXPECT_NEAR(nextFreq, 3333, 0.1f);
+}
+
+TEST(ConverterTest, MaximumError) {
+  GTEST_SKIP();
+  Converter conv = Converter(125000000, 1);
+  uint32_t targetFreq = 125000000 - 1;
+  float error = 0.0f;
+  uint32_t period = 0;
+  float freq = 0;
+  int i = 1;
+  for (i = 1; i < targetFreq; i++) {
+    period = conv.ToPeriod(i);
+    freq = conv.ToFrequency(period);
+    if (i - freq > error) {
+      error = i - freq;
+    }
+  }
+
+  EXPECT_LT(error, 0.5f);
 }

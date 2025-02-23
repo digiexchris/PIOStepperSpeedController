@@ -1,4 +1,6 @@
 #include "PIOStepper.hxx"
+#include "Stepper.hxx"
+
 
 namespace PIOStepperSpeedController {
 
