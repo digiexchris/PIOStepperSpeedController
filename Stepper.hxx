@@ -225,6 +225,9 @@ public:
   }
   StepperState GetState() { return myState; }
 
+protected:
+  Converter myConverter;
+
 private:
   bool Step(StepperState aState) {
     switch (aState) {
@@ -328,7 +331,6 @@ private:
       break;
     }
   }
-  Converter myConverter;
 
   // Function pointers (typically 8 bytes on 64-bit systems)
   Callback myStoppedCallback;

@@ -8,13 +8,13 @@
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "openocd",
-            "serverpath": "${userHome}/.pico-sdk/openocd/0.12.0+dev/openocd.exe",
-            "gdbPath": "${command:raspberry-pi-pico.getGDBPath}",
+            "gdbPath": "/home/chris/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gdb",
             "device": "${command:raspberry-pi-pico.getChipUppercase}",
             "configFiles": [
                 "interface/cmsis-dap.cfg",
                 "target/${command:raspberry-pi-pico.getTarget}.cfg"
             ],
+            "showDevDebugOutput": "raw",
             "svdFile": "${userHome}/.pico-sdk/sdk/2.1.0/src/${command:raspberry-pi-pico.getChip}/hardware_regs/${command:raspberry-pi-pico.getChipUppercase}.svd",
             "runToEntryPoint": "main",
             // Fix for no_flash binaries, where monitor reset halt doesn't do what is expected
@@ -35,7 +35,7 @@
             "type": "cortex-debug",
             "servertype": "external",
             "gdbTarget": "localhost:3333",
-            "gdbPath": "${command:raspberry-pi-pico.getGDBPath}",
+            "gdbPath": "/home/chris/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gdb",
             "device": "${command:raspberry-pi-pico.getChipUppercase}",
             "svdFile": "${userHome}/.pico-sdk/sdk/2.1.0/src/${command:raspberry-pi-pico.getChip}/hardware_regs/${command:raspberry-pi-pico.getChipUppercase}.svd",
             "runToEntryPoint": "main",
@@ -55,7 +55,7 @@
             "MIMode": "gdb",
             "miDebuggerPath": "${command:raspberry-pi-pico.getGDBPath}",
             "miDebuggerServerAddress": "localhost:3333",
-            "debugServerPath": "${userHome}/.pico-sdk/openocd/0.12.0+dev/openocd.exe",
+            "debugServerPath": "${userHome}/.pico-sdk/openocd/0.12.0+dev/openocd",
             "debugServerArgs": "-f interface/cmsis-dap.cfg -f target/${command:raspberry-pi-pico.getTarget}.cfg -c \"adapter speed 5000\"",
             "serverStarted": "Listening on port .* for gdb connections",
             "filterStderr": true,
