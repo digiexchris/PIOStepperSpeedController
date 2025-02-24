@@ -137,10 +137,9 @@ TEST_F(StepperTest, Deceleration) {
 
   // Now set a lower target
   stepper->SetTargetHz(500);
-  EXPECT_EQ(stepper->GetState(), StepperState::DECELERATING);
 
   stepper->Update();
-
+  EXPECT_EQ(stepper->GetState(), StepperState::DECELERATING);
   // After one update, frequency should decrease by deceleration/update_rate
   // With 1000Hz^2 deceleration, after 1ms (1kHz update rate),
   // we expect frequency to decrease by 1Hz

@@ -22,7 +22,6 @@ FetchContent_MakeAvailable(googletest)
 add_executable(stepper_tests
     ${CMAKE_CURRENT_SOURCE_DIR}/test_Stepper.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/test_Converter.cxx
-    ${CMAKE_CURRENT_SOURCE_DIR}/../Stepper.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/../Converter.cxx
 )
 target_include_directories(stepper_tests PUBLIC
