@@ -53,7 +53,7 @@ const uint deceleration = 2000; // steps per second squared
 // sysclk/prescaler as the maximum speed. For an averate rp2040 with a
 // 125mhz sysclk, this means with a prescaler of 1250, the maximum speed
 // is 100,000 steps per second.
-const uint prescaler = 1250;
+const uint prescaler = 125;
 
 struct Sequence {
   uint32_t nextPhase = 0;
@@ -84,9 +84,9 @@ int main() {
   // Now, do something interesting with the motor, like set it to a random
   // speed between 0 and the max, and wait till it reaches that speed
 
-  sleep_ms(500);
+  sleep_ms(250);
   printf("Starting!\n");
-
+  stdio_flush();
   StepperState state;
 
   bool aStepOccurred = false;
@@ -101,8 +101,8 @@ int main() {
   // or the max speed. So, I'll just min() that so that the
   // example continues to run
 
-  sequence->targetSpeed[0] = 5000;
-  sequence->targetSpeed[1] = 7000;
+  sequence->targetSpeed[0] = dist(gen);
+  sequence->targetSpeed[1] = dist(gen);
 
   stepper->SetTargetHz(sequence->targetSpeed[1000]);
   sequence->nextPhase = 0;
@@ -110,7 +110,7 @@ int main() {
   while (true) {
 
     count++;
-    if (count >= 100) {
+    if (count >= 10000) {
       count = 0;
       // Get some info from the stepper and command it to do things
       speed = stepper->GetCurrentFrequency();
@@ -140,6 +140,8 @@ int main() {
       auto targetHz = stepper->GetTargetFrequency();
       std::cout << "Current Hz: " << currentHz << " Target Hz: " << targetHz
                 << "\n";
+
+      stdio_flush();
     }
 
     // maintain the internal state of the stepper. Call this as fast as
@@ -150,9 +152,11 @@ int main() {
     stepper->Update();
 
     tight_loop_contents();
-    sleep_ms(10); // just doing this so tinyusb can maintain the serial
-                  // output, normally I use freertos tasks and follow the
-                  // above note about timing
+    // sleep_us(10); // just doing this as an example of what not to do.
+    // normally I use freertos tasks and follow the
+    //  above note about timing
+    //  for example, I was originally sleeping for 10ms, which
+    //  ended up making the PIO program run at a maximum of 100hz!
   }
 }
 
@@ -167,16 +171,17 @@ int main() {
 // the output.
 void aStoppedCallback(CallbackEvent event) {
   printf("Stopped Callback called\n");
+  sleep_ms(500);
   // __breakpoint();
   sequence->nextPhase = 1;
   sequence->targetSpeed[0] = dist(gen);
   sequence->targetSpeed[1] = dist(gen);
   stepper->SetTargetHz(sequence->targetSpeed[0]);
   stepper->Start();
-  sleep_ms(500);
 }
 void aCoastingCallback(CallbackEvent event) {
-  printf("Coasting Callback called\n");
+  printf("Coasting Callback called with a frequency of %f\n",
+         stepper->GetCurrentFrequency());
   //__breakpoint();
   switch (sequence->nextPhase) {
   case 0:
@@ -191,17 +196,14 @@ void aCoastingCallback(CallbackEvent event) {
     stepper->Stop();
     break;
   }
-  sleep_ms(500);
 }
 
 void aAcceleratingCallback(CallbackEvent event) {
   printf("Accelerating Callback called\n");
   //__breakpoint();
-  sleep_ms(500);
 }
 
 void aDeceleratingCallback(CallbackEvent event) {
   printf("Decelerating Callback Called\n");
   //__breakpoint();
-  sleep_ms(500);
 }

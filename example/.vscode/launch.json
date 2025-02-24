@@ -8,7 +8,7 @@
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "openocd",
-            "gdbPath": "/home/chris/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gdb",
+            "gdbPath": "/home/vscode/.pico-sdk/toolchain/13_3_Rel1/bin/arm-none-eabi-gdb",
             "device": "${command:raspberry-pi-pico.getChipUppercase}",
             "configFiles": [
                 "interface/cmsis-dap.cfg",
@@ -34,11 +34,11 @@
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "external",
-            "gdbTarget": "localhost:3333",
-            "gdbPath": "/home/chris/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gdb",
+            "gdbTarget": "localhost:50000",
+            "gdbPath": "${command:raspberry-pi-pico.getGDBPath}",
             "device": "${command:raspberry-pi-pico.getChipUppercase}",
             "svdFile": "${userHome}/.pico-sdk/sdk/2.1.0/src/${command:raspberry-pi-pico.getChip}/hardware_regs/${command:raspberry-pi-pico.getChipUppercase}.svd",
-            "runToEntryPoint": "main",
+            // "runToEntryPoint": "main",
             // Fix for no_flash binaries, where monitor reset halt doesn't do what is expected
             // Also works fine for flash binaries
             "overrideLaunchCommands": [

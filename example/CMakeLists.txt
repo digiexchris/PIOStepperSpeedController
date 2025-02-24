@@ -23,7 +23,7 @@ else()
     set(USERHOME $ENV{HOME})
 endif()
 set(sdkVersion 2.1.0)
-set(toolchainVersion 14_2_Rel1)
+set(toolchainVersion 13_3_Rel1)
 set(picotoolVersion 2.1.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
@@ -49,13 +49,17 @@ add_executable(hello_PIOStepperSpeedController)
 
 target_sources(hello_PIOStepperSpeedController PRIVATE main.cxx)
 
-include(FetchContent)
-FetchContent_Declare(
-    PIOStepperSpeedController
-    GIT_REPOSITORY https://github.com/digiexchris/PIOStepperSpeedController.git
-    GIT_TAG main
-)
-FetchContent_MakeAvailable(PIOStepperSpeedController)
+
+# Example of using FetchContent to install
+# include(FetchContent)
+# FetchContent_Declare(
+#     PIOStepperSpeedController
+#     GIT_REPOSITORY https://github.com/digiexchris/PIOStepperSpeedController.git
+#     GIT_TAG main
+# )
+# FetchContent_MakeAvailable(PIOStepperSpeedController)
+
+add_subdirectory(lib/PIOStepper PIOStepperSpeedController)
 
 target_link_libraries(hello_PIOStepperSpeedController PRIVATE
         pico_stdlib

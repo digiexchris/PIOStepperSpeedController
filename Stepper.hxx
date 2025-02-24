@@ -103,6 +103,7 @@ public:
       myIsRunning = true;
     }
   }
+
   void Stop() {
     if (myState == StepperState::STOPPED || myState == StepperState::STOPPING) {
       return;
@@ -156,8 +157,13 @@ public:
       if (myCurrentFrequency == myTargetFrequency) {
         Step(StepperState::COASTING);
       } else {
-        // only thing that can result in a speed change after coasting is a
-        // SetTargetHz or Stop
+        if (myCurrentFrequency > myTargetFrequency) {
+          TransitionTo(StepperState::DECELERATING);
+          Step(StepperState::DECELERATING);
+        } else {
+          TransitionTo(StepperState::ACCELERATING);
+          Step(StepperState::ACCELERATING);
+        }
         return false;
       }
       break;
@@ -182,21 +188,8 @@ public:
 
     myTargetFrequency = aSpeedHz;
 
-    if (myTargetFrequency > myCurrentFrequency) {
-      if (myTargetFrequency > myMaxFrequency) {
-        myTargetFrequency = myMaxFrequency;
-      }
-      if (myState != StepperState::STARTING &&
-          myState != StepperState::ACCELERATING) {
-        TransitionTo(StepperState::ACCELERATING);
-      }
-
-    }
-
-    else if (myTargetFrequency < myCurrentFrequency) {
-      if (myState != StepperState::DECELERATING) {
-        TransitionTo(StepperState::DECELERATING);
-      }
+    if (myTargetFrequency > myMaxFrequency) {
+      myTargetFrequency = myMaxFrequency;
     }
   }
 

@@ -15,7 +15,6 @@ add_library(PIOStepperSpeedController
     ${CMAKE_CURRENT_SOURCE_DIR}/Converter.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/Converter.hxx
     ${CMAKE_CURRENT_SOURCE_DIR}/Stepper.hxx
-    ${CMAKE_CURRENT_SOURCE_DIR}/Stepper.cxx
 )
 
 # Generate PIO header

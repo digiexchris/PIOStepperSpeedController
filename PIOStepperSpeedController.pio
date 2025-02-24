@@ -1,18 +1,31 @@
-.pio_version 0 ; only requires PIO version 0
+; .pio_version 0 ; only requires PIO version 0
 
 .program StepperSpeedController
+; .side_set 1 opt
+
 .wrap_target
-pull noblock      ; If FIFO empty: keeps old OSR value
-    out y, 32        ; Always empties OSR into Y
-                     ; Y now holds our working value
-    mov x, y         ; Copy from Y (Y preserved) into X
-    set pins, 1   
-lp1:
-    jmp x-- lp1   ; go to lp1, decrement x after the jmp. repeat until X is 0
+    pull block
+    out y, 16        ; Get upper 16 bits for first delay
+    out x, 16        ; Get lower 16 bits for second delay
+    set pins, 1      ; HIGH
+delay_high:
+    jmp x-- delay_high
     
-    mov x, y       ;Copy from Y again (Y still preserved)
-    set pins, 0  
-lp2:
-    jmp x-- lp2   ; Delay for the same number of cycles again for the low state
-    mov osr, y       ; Preserve Y in OSR before wrap in case the FIFO is empty
-.wrap             ; Blink forever!
+    set pins, 0      ; LOW
+    mov x, y         ; Reload delay value
+delay_low:
+    jmp x-- delay_low
+.wrap
+
+; .program StepperSpeedController
+;     pull block
+;     out y, 32
+; .wrap_target
+;     mov x, y
+;     set pins, 1   ; Turn LED on
+; lp1:
+;     jmp x-- lp1   ; Delay for (x + 1) cycles, x is a 32 bit number
+;     set pins, 0   ; Turn LED off
+; lp2:
+;     jmp y-- lp2   ; Delay for the same number of cycles again
+; .wrap             ; Blink forever!

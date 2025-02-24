@@ -21,6 +21,7 @@ public:
   bool PutStep(float aFrequency);
 
 private:
+  bool IsSmEnabled();
   PIO myPio;
   uint mySm;
   uint myOffset;
