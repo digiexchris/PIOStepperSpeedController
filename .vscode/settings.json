@@ -1,7 +1,6 @@
 {
     "cmake.sourceDirectory": [
-        "${workspaceFolder}/tests",
-        "${workspaceFolder}/example"
+        "${workspaceFolder}/tests"
     ],
     "cmake.options.statusBarVisibility": "visible",
     "testMate.cpp.test.advancedExecutables": ["${workspaceFolder}/tests/build/stepper_tests"],

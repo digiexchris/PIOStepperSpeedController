@@ -1,0 +1,17 @@
+StepperTest.InitialState 1 0.00410405
+StepperTest.StartStop 1 0.00542852
+StepperTest.StartThenSetTargetHzThenCoast 1 0.0555989
+StepperTest.Acceleration 1 0.00406402
+StepperTest.Deceleration 1 0.00525786
+StepperTest.Callbacks 1 0.0660399
+StepperTest.GetCurrentPeriod 1 0.00330908
+StepperTest.FrequencyConversion 1 0.00372611
+ConverterTest.ConstructorValidation 1 0.0142191
+ConverterTest.ToPeriodCalculation 1 0.00378984
+ConverterTest.ToFrequencyCalculation 1 0.00947263
+ConverterTest.PrescalerEffects 1 0.00883707
+ConverterTest.CalculateNextFrequency 1 0.00629843
+ConverterTest.AccelerateFrom1HzTo2001Hz 1 0.0140861
+ConverterTest.AccelerateFrom100HzTo3333Hz 1 0.00533207
+ConverterTest.MaximumError 0 0
+---

@@ -1,4 +1,4 @@
-#include "../Stepper.hxx"
+#include <PIOStepperSpeedController/Stepper.hxx>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <memory>

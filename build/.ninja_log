@@ -1,0 +1,15 @@
+# ninja log v5
+2	3450	1740458009398456496	_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o	d02f777bd3cfbb01
+1	4235	1740458010190465052	_deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o	872ae0497bccefae
+1	5506	1740458011436478509	_deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o	541e555098c7f47b
+2	8977	1740458014874515623	_deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o	999cd0ddfd57223f
+181	244	1740458130877753742	lib/libgmock_main.a	fd667ec073d1320c
+3	78	1740458130701751883	lib/libgtest.a	505324fa9dc7955c
+81	170	1740458130779752707	lib/libgtest_main.a	b5be33271976f8c
+78	181	1740458130791752834	lib/libgmock.a	90bf57332786e86f
+2	490	1740458487333429638	CMakeFiles/stepper_tests.dir/workspace/Converter.cxx.o	6dd08352e92f4e5
+2	2570	1740458489415450692	CMakeFiles/stepper_tests.dir/test_Converter.cxx.o	8932be1aa764540c
+2	4333	1740458491158468315	CMakeFiles/stepper_tests.dir/test_Stepper.cxx.o	9b3fd19c31750f62
+4333	4788	1740458491636473148	stepper_tests	596e8b9d7cce9048
+4333	4788	1740458491636473148	stepper_tests[1]_tests.cmake	596e8b9d7cce9048
+4333	4788	1740458491636473148	/workspace/build/stepper_tests[1]_tests.cmake	596e8b9d7cce9048

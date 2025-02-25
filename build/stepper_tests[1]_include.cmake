@@ -1,0 +1,5 @@
+if(EXISTS "/workspace/build/stepper_tests[1]_tests.cmake")
+  include("/workspace/build/stepper_tests[1]_tests.cmake")
+else()
+  add_test(stepper_tests_NOT_BUILT stepper_tests_NOT_BUILT)
+endif()

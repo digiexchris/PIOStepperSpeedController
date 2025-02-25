@@ -25,7 +25,7 @@ add_executable(stepper_tests
     ${CMAKE_CURRENT_SOURCE_DIR}/../Converter.cxx
 )
 target_include_directories(stepper_tests PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(stepper_tests PRIVATE
     gtest

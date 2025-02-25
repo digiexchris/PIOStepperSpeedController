@@ -11,20 +11,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Create library target
 add_library(PIOStepperSpeedController
     ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepper.cxx
-    ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepper.hxx
     ${CMAKE_CURRENT_SOURCE_DIR}/Converter.cxx
-    ${CMAKE_CURRENT_SOURCE_DIR}/Converter.hxx
-    ${CMAKE_CURRENT_SOURCE_DIR}/Stepper.hxx
 )
 
 # Generate PIO header
 pico_generate_pio_header(PIOStepperSpeedController
-    ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.pio
+    ${CMAKE_CURRENT_SOURCE_DIR}/PIOStepperSpeedController.pio OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include/PIOStepperSpeedController
+
 )
 
 # Set include directories
 target_include_directories(PIOStepperSpeedController PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # Link against pico dependencies

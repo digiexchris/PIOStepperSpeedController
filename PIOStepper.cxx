@@ -1,6 +1,6 @@
-#include "PIOStepper.hxx"
-#include "PIOStepperSpeedController.pio.h"
-#include "Stepper.hxx"
+#include <PIOStepperSpeedController/PIOStepper.hxx>
+#include <PIOStepperSpeedController/PIOStepperSpeedController.pio.h>
+#include <PIOStepperSpeedController/Stepper.hxx>
 #include <algorithm>
 #include <cassert>
 #include <cstdio>

@@ -1,0 +1,35 @@
+Start testing: Feb 25 04:42 UTC
+----------------------------------------------------------
+16/16 Testing: ConverterTest.MaximumError
+16/16 Test: ConverterTest.MaximumError
+Command: "/workspace/build/stepper_tests" "--gtest_filter=ConverterTest.MaximumError" "--gtest_also_run_disabled_tests"
+Directory: /workspace/build
+"ConverterTest.MaximumError" start time: Feb 25 04:42 UTC
+Output:
+----------------------------------------------------------
+Running main() from /workspace/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = ConverterTest.MaximumError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ConverterTest
+[ RUN      ] ConverterTest.MaximumError
+/workspace/tests/test_Converter.cxx:119: Skipped
+
+[  SKIPPED ] ConverterTest.MaximumError (0 ms)
+[----------] 1 test from ConverterTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  SKIPPED ] 1 test, listed below:
+[  SKIPPED ] ConverterTest.MaximumError
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Pass Reason:
+Skip regular expression found in output. Regex=[\[  SKIPPED \]]
+"ConverterTest.MaximumError" end time: Feb 25 04:42 UTC
+"ConverterTest.MaximumError" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Feb 25 04:42 UTC

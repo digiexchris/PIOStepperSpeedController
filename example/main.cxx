@@ -17,7 +17,7 @@
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 
-#include <PIOStepper.hxx>
+#include <PIOStepperSpeedController/PIOStepper.hxx>
 #include <format>
 #include <iostream>
 
