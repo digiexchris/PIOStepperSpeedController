@@ -9,12 +9,13 @@
 
 namespace PIOStepperSpeedController {
 
-PIOStepper::PIOStepper(uint32_t stepPin, float aMinSpeed, float aMaxSpeed,
-                       uint32_t aAcceleration, uint32_t aDeceleration,
-                       uint32_t aSysClk, uint32_t aPrescaler,
-                       Callback aStoppedCallback, Callback aCoastingCallback,
-                       Callback aAcceleratingCallback,
-                       Callback aDeceleratingCallback)
+PIOStepper::PIOStepper(
+    uint32_t stepPin, float aMinSpeed, float aMaxSpeed, uint32_t aAcceleration,
+    uint32_t aDeceleration, uint32_t aSysClk, uint32_t aPrescaler,
+    ::PIOStepperSpeedController::Callback aStoppedCallback,
+    ::PIOStepperSpeedController::Callback aCoastingCallback,
+    ::PIOStepperSpeedController::Callback aAcceleratingCallback,
+    ::PIOStepperSpeedController::Callback aDeceleratingCallback)
     : Stepper<PIOStepper>(aMinSpeed, aMaxSpeed, aAcceleration, aDeceleration,
                           aSysClk, aPrescaler, aStoppedCallback,
                           aCoastingCallback, aAcceleratingCallback,
