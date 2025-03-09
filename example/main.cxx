@@ -31,7 +31,7 @@ void aDeceleratingCallback(CallbackEvent event);
 PIOStepper *stepper = nullptr;
 static semaphore_t stepperSemaphore;
 
-const uint stepPin = 2;
+const uint stepPin = 6;
 
 // due to a divide by zero issue, minSpeed must NOT be 0. Consider this
 // the speed at which the motor is capable of moving at from a dead stop

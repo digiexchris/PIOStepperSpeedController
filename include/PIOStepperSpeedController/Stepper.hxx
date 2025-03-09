@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "Converter.hxx"
@@ -7,6 +6,26 @@
 #include <cstdint>
 
 namespace PIOStepperSpeedController {
+
+  static bool IsEq(float a, float b, float epsilon = 0.1f) {
+    return std::abs(a - b) < epsilon;
+  }
+
+  static bool IsLT(float a, float b, float epsilon = 0.1f) {
+    return a < b - epsilon;
+  }
+
+  static bool IsLTEQ(float a, float b, float epsilon = 0.1f) {
+    return a <= b || IsEq(a, b, epsilon);
+  }
+
+  static bool IsGT(float a, float b, float epsilon = 0.1f) {
+    return a > b + epsilon;
+  }
+
+  static bool IsGTEQ(float a, float b, float epsilon = 0.1f) {
+    return a >= b || IsEq(a, b, epsilon);
+  }
 
 enum class StepperState {
   STOPPED,
@@ -91,17 +110,23 @@ public:
     myMaxFrequency = std::min(myConverter.ToFrequency(1), aMaxSpeed);
     myCurrentFrequency = myMinFrequency;
     myTargetFrequency = myMinFrequency;
+    myRequestedFrequency = myMinFrequency;
     myIsRunning = false;
   }
 
   void Start() {
-
     if (!myIsRunning) {
       myCurrentFrequency = myMinFrequency;
       static_cast<Derived *>(this)->EnableImpl();
-      TransitionTo(StepperState::STARTING);
+      
       myIsRunning = true;
     }
+    
+    //shoiuld be handled by the Starting case in Update()
+    // // Set target frequency to the user's requested frequency (or min speed)
+    // myTargetFrequency = std::max(myRequestedFrequency, myMinFrequency);
+    
+    TransitionTo(StepperState::STARTING);
   }
 
   void Stop() {
@@ -119,12 +144,31 @@ public:
       return false;
     }
 
+    switch(myState) {
+      case StepperState::STOPPED:
+      case StepperState::STOPPING:
+
+        //if the speed changed since last update and we are not stopping
+        if(!IsEq(myTargetFrequency, myMinFrequency)) {
+          myTargetFrequency = myMinFrequency;
+        }
+        myTargetFrequency = myMinFrequency;
+        break;
+      default:
+
+        //if the speed changed since last update and we are not stopping
+        if(!IsEq(myTargetFrequency, myRequestedFrequency)) {
+          myTargetFrequency = myRequestedFrequency;
+        }
+        break;
+    }
+
     switch (myState) {
     case StepperState::STOPPED:
       return false;
       break;
     case StepperState::STOPPING:
-      if (myCurrentFrequency <= myMinFrequency) {
+      if (IsLTEQ(myCurrentFrequency, myMinFrequency)) {
         myIsRunning = false;
         static_cast<Derived *>(this)->DisableImpl();
         TransitionTo(StepperState::STOPPED);
@@ -134,10 +178,10 @@ public:
       }
       break;
     case StepperState::STARTING:
-      if (myCurrentFrequency < myTargetFrequency) {
+      if (IsLT(myCurrentFrequency, myTargetFrequency)) {
         TransitionTo(StepperState::ACCELERATING);
         Step(StepperState::ACCELERATING);
-      } else if (myCurrentFrequency == myTargetFrequency) {
+      } else if (IsEq(myCurrentFrequency, myTargetFrequency)) {
         TransitionTo(StepperState::COASTING);
         Step(StepperState::COASTING);
       } else {
@@ -146,7 +190,7 @@ public:
       }
       break;
     case StepperState::ACCELERATING:
-      if (myCurrentFrequency < myTargetFrequency) {
+      if (IsLT(myCurrentFrequency, myTargetFrequency)) {
         Step(StepperState::ACCELERATING);
       } else {
         TransitionTo(StepperState::COASTING);
@@ -154,10 +198,10 @@ public:
       }
       break;
     case StepperState::COASTING:
-      if (myCurrentFrequency == myTargetFrequency) {
+      if (IsEq(myCurrentFrequency,myTargetFrequency)) {
         Step(StepperState::COASTING);
       } else {
-        if (myCurrentFrequency > myTargetFrequency) {
+        if (IsGT(myCurrentFrequency,myTargetFrequency)) {
           TransitionTo(StepperState::DECELERATING);
           Step(StepperState::DECELERATING);
         } else {
@@ -168,7 +212,7 @@ public:
       }
       break;
     case StepperState::DECELERATING:
-      if (myCurrentFrequency > myTargetFrequency) {
+    if (IsGT(myCurrentFrequency,myTargetFrequency)) {
         Step(StepperState::DECELERATING);
       } else {
         TransitionTo(StepperState::COASTING);
@@ -181,16 +225,24 @@ public:
   }
 
   void SetTargetHz(uint32_t aSpeedHz) {
-    if (aSpeedHz == 0) {
-      myTargetFrequency = myCurrentFrequency;
+    if (myState == StepperState::STOPPED || myState == StepperState::STOPPING) {
+      // Store the requested frequency even during stopping, but don't change target
+      // This ensures the speed is remembered for next Start()
+      if (aSpeedHz > 0) {
+        myRequestedFrequency = std::min(static_cast<float>(aSpeedHz), myMaxFrequency);
+      }
       return;
     }
 
-    myTargetFrequency = aSpeedHz;
-
-    if (myTargetFrequency > myMaxFrequency) {
-      myTargetFrequency = myMaxFrequency;
+    if (aSpeedHz == 0) {
+      myRequestedFrequency = myCurrentFrequency;
+      return;
     }
+
+    // Store the user's requested frequency
+    myRequestedFrequency = std::min(static_cast<float>(aSpeedHz), myMaxFrequency);
+    
+
   }
 
   uint32_t GetCurrentPeriod() const {
@@ -216,6 +268,11 @@ public:
       return myTargetFrequency;
     }
   }
+  
+  float GetRequestedFrequency() const {
+    return myRequestedFrequency;
+  }
+  
   StepperState GetState() { return myState; }
 
 protected:
@@ -336,14 +393,11 @@ private:
   uint32_t myDeceleration;
   uint32_t mySysClk;
   uint32_t myPrescaler;
-  // uint32_t myCurrentPeriod;
-  // uint32_t myTargetPeriod;
-  // uint32_t myMaxPeriod;
-  // uint32_t myMinPeriod;
   float myMaxFrequency;
   float myMinFrequency;
   float myCurrentFrequency;
   float myTargetFrequency;
+  float myRequestedFrequency;  // Tracks user's requested frequency separately
 
   // 1-byte members
   StepperState myState;

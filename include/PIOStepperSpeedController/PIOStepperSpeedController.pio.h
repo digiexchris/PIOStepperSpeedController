@@ -18,14 +18,14 @@
 
 static const uint16_t StepperSpeedController_program_instructions[] = {
             //     .wrap_target
-    0x80a0, //  0: pull   block                      
-    0x6050, //  1: out    y, 16                      
-    0x6030, //  2: out    x, 16                      
-    0xe001, //  3: set    pins, 1                    
-    0x0044, //  4: jmp    x--, 4                     
-    0xe000, //  5: set    pins, 0                    
-    0xa022, //  6: mov    x, y                       
-    0x0047, //  7: jmp    x--, 7                     
+    0x80a0, //  0: pull   block
+    0x6050, //  1: out    y, 16
+    0x6030, //  2: out    x, 16
+    0xe001, //  3: set    pins, 1
+    0x0044, //  4: jmp    x--, 4
+    0xe000, //  5: set    pins, 0
+    0xa022, //  6: mov    x, y
+    0x0047, //  7: jmp    x--, 7
             //     .wrap
 };
 

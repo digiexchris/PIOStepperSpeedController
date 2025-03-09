@@ -3,10 +3,10 @@
         "${workspaceFolder}/tests"
     ],
     "cmake.options.statusBarVisibility": "visible",
-    "testMate.cpp.test.advancedExecutables": ["${workspaceFolder}/tests/build/stepper_tests"],
+    "testMate.cpp.test.advancedExecutables": ["${workspaceFolder}/tests/build/stepper_tests", "${workspaceFolder}/build/stepper_tests"],
     "testMate.cpp.debug.configTemplate": {
   "type": "cppvsdbg",
-  "linux": { "type": "cppdbg", "MIMode": "gdb" },
+  "linux": { "type": "lldb", "MIMode": "lldb" },
   "darwin": { "type": "cppdbg", "MIMode": "lldb" },
   "win32": { "type": "cppvsdbg" },
   "program": "${exec}",
